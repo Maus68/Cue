@@ -249,6 +249,19 @@ readScene();
   readScene = function () { stopListening(); originalReadScene(); resetFeedback(); };
 })();
 </script>
+<script id="role-voices-script">
+window.cueVoiceForRole = function (role) {
+  const setting = D.roleVoices?.[role] || {};
+  const voices = window.speechSynthesis.getVoices().filter(v => /^nl(?:[-_]|$)/i.test(v.lang));
+  const explicit = voices.find(v => v.name === setting.voice);
+  const male = /\b(frank|ruben|xander|maarten|arthur|male|man)\b/i;
+  const female = /\b(colette|femke|lotte|claire|ellen|saskia|laura|female|vrouw)\b/i;
+  const matched = setting.gender === 'male' ? voices.find(v => male.test(v.name))
+    : setting.gender === 'female' ? voices.find(v => female.test(v.name)) : null;
+  return { voice: explicit || matched || voices[0], fallback: !!setting.gender && !explicit && !matched,
+    pitch: setting.gender === 'male' ? 0.85 : setting.gender === 'female' ? 1.15 : 1 };
+};
+</script>
 <script id="cue-read-aloud">
 (function () {
   const supported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
@@ -276,8 +289,8 @@ readScene();
     }
     const lines = cards.slice(from, practicing ? pos : cards.length)
       .filter(card => !isMine(card))
-      .map(card => card.text.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim())
-      .filter(text => /[\p{L}\p{N}]/u.test(text));
+      .map(card => ({ role: card.role, text: card.text.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim() }))
+      .filter(card => /[\p{L}\p{N}]/u.test(card.text));
     if (!lines.length) {
       $('status').textContent = 'Hier zijn geen replieken van tegenspelers om voor te lezen.';
       window.dispatchEvent(new Event('cue-reading-finished'));
@@ -289,7 +302,6 @@ readScene();
     speaking = true;
     button.textContent = '■ Stop voorlezen';
     const token = generation;
-    const voice = window.speechSynthesis.getVoices().find(v => /^nl[-_]/i.test(v.lang));
     function speak(index) {
       if (token !== generation) return;
       if (index >= lines.length) {
@@ -298,9 +310,11 @@ readScene();
         window.dispatchEvent(new Event('cue-reading-finished'));
         return;
       }
-      const utterance = new SpeechSynthesisUtterance(lines[index]);
+      const utterance = new SpeechSynthesisUtterance(lines[index].text);
+      const selection = window.cueVoiceForRole(lines[index].role);
       utterance.lang = 'nl-NL';
-      if (voice) utterance.voice = voice;
+      if (selection.voice) utterance.voice = selection.voice;
+      if (selection.fallback) utterance.pitch = selection.pitch;
       utterance.onend = () => speak(index + 1);
       utterance.onerror = () => {
         if (token !== generation) return;
@@ -330,10 +344,68 @@ readScene();
     '<p><label>Speler<br><select id="edit-role"></select></label></p>' +
     '<label>Tekst (regieaanwijzingen tussen haakjes)<br><textarea id="edit-text" rows="7" style="box-sizing:border-box;width:100%;padding:10px;font:inherit"></textarea></label>' +
     '<p><button id="edit-save" type="button">Sla repliek op</button> <button id="edit-download" type="button">Download index.html voor GitHub</button></p>' +
-    '<p id="edit-status" aria-live="polite">Wijzigingen zijn pas voor iedereen zichtbaar na uploaden naar GitHub. Download ze vóór je deze pagina sluit.</p>';
+    '<p id="edit-status" aria-live="polite">Wijzigingen zijn pas voor iedereen zichtbaar na uploaden naar GitHub. Download ze vóór je deze pagina sluit.</p>' +
+    '<h3>Stemmen per speler</h3><p>Kies man of vrouw en beluister het voorbeeld. Je kunt ook zelf een Nederlandse stem kiezen. Stemmen verschillen per apparaat. Zonder passende stem gebruikt Cue! de standaardstem met een lagere of hogere toonhoogte.</p><div id="role-voice-settings"></div>';
   document.querySelector('main').appendChild(editor);
   const sceneSelect = $('edit-scene'), lineSelect = $('edit-line');
   let dirty = false, unsaved = false;
+  D.roleVoices = D.roleVoices || {};
+  const voiceRows = [];
+  D.roles.forEach(role => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0';
+    const label = document.createElement('strong');
+    label.textContent = role;
+    label.style.minWidth = '110px';
+    const gender = document.createElement('select');
+    gender.setAttribute('aria-label', `Man of vrouw voor ${role}`);
+    gender.add(new Option('Standaard', ''));
+    gender.add(new Option('Man', 'male'));
+    gender.add(new Option('Vrouw', 'female'));
+    gender.value = D.roleVoices[role]?.gender || '';
+    const voice = document.createElement('select');
+    voice.style.maxWidth = '100%';
+    voice.setAttribute('aria-label', `Stem voor ${role}`);
+    const preview = document.createElement('button');
+    preview.textContent = '▶ Luister';
+    preview.type = 'button';
+    preview.disabled = !('speechSynthesis' in window);
+    function saveSetting() {
+      D.roleVoices[role] = { gender: gender.value, voice: voice.value };
+      dirty = true;
+      $('edit-status').textContent = 'Stemkeuze opgeslagen. Download index.html en upload dit naar GitHub om deze instelling te delen.';
+    }
+    gender.onchange = () => { voice.value = ''; saveSetting(); };
+    voice.onchange = saveSetting;
+    preview.onclick = () => {
+      if ($('listen').textContent.startsWith('■')) $('listen').click();
+      if ($('speak-cues').textContent.startsWith('■')) $('speak-cues').click();
+      window.speechSynthesis.cancel();
+      const selection = window.cueVoiceForRole(role);
+      const utterance = new SpeechSynthesisUtterance(`Hallo, ik speel ${role}. Dit is mijn stem.`);
+      utterance.lang = 'nl-NL';
+      if (selection.voice) utterance.voice = selection.voice;
+      if (selection.fallback) utterance.pitch = selection.pitch;
+      $('edit-status').textContent = selection.fallback ? 'Geen passende mannelijke of vrouwelijke stem gevonden. Je hoort de standaardstem met aangepaste toonhoogte. Kies eventueel zelf een stem.' : 'Luistervoorbeeld voor ' + role;
+      window.speechSynthesis.speak(utterance);
+    };
+    row.append(label, gender, voice, preview);
+    $('role-voice-settings').appendChild(row);
+    voiceRows.push({ role, voice });
+  });
+  function refreshVoices() {
+    const voices = 'speechSynthesis' in window ? window.speechSynthesis.getVoices().filter(v => /^nl(?:[-_]|$)/i.test(v.lang)) : [];
+    voiceRows.forEach(({ role, voice }) => {
+      const saved = D.roleVoices[role]?.voice || '';
+      voice.innerHTML = '';
+      voice.add(new Option('Automatisch kiezen', ''));
+      voices.forEach(v => voice.add(new Option(`${v.name} (${v.lang})`, v.name)));
+      if (saved && !voices.some(v => v.name === saved)) voice.add(new Option(saved + ' (niet op dit apparaat)', saved));
+      voice.value = saved;
+    });
+  }
+  if ('speechSynthesis' in window) window.speechSynthesis.addEventListener('voiceschanged', refreshVoices);
+  refreshVoices();
   D.scenes.forEach((scene, index) => sceneSelect.add(new Option(scene.title, index)));
   D.roles.forEach(role => $('edit-role').add(new Option(role, role)));
   function loadLine() {
