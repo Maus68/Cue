@@ -97,6 +97,7 @@ readScene();
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
   let listening = false;
+  let restartTimer = null;
   let finalTranscript = '';
 
   const style = document.createElement('style');
@@ -156,18 +157,22 @@ readScene();
     if (help()) help().textContent = 'Zeg je verborgen repliek. De herkenning vergelijkt alleen gesproken woorden; regieaanwijzingen tellen niet mee.';
   };
   const stopListening = () => {
-    if (recognition && listening) recognition.stop();
     listening = false;
+    clearTimeout(restartTimer);
+    restartTimer = null;
+    if (recognition) recognition.stop();
     if (SpeechRecognition) listenButton.textContent = '🎙️ Start spraakoefening';
   };
   const startListening = () => {
     if (!practicing) { $('status').textContent = 'Kies eerst “Start oefenen” om een repliek te oefenen.'; return; }
     resetFeedback();
     recognition = new SpeechRecognition();
+    const session = recognition;
     recognition.lang = 'nl-NL';
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.onresult = event => {
+      if (recognition !== session) return;
       let interim = '';
       for (let index = event.resultIndex; index < event.results.length; index++) {
         const text = event.results[index][0].transcript;
@@ -178,10 +183,31 @@ readScene();
       updateScore();
     };
     recognition.onerror = event => {
+      if (recognition !== session || !listening) return;
+      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      listening = false;
+      clearTimeout(restartTimer);
+      listenButton.textContent = '🎙️ Start spraakoefening';
       const messages = { 'not-allowed': 'Microfoontoegang is niet toegestaan. Sta deze toe in de browser en probeer opnieuw.', 'no-speech': 'Geen spraak gehoord. Probeer het opnieuw.', 'network': 'Spraakherkenning heeft een netwerkverbinding nodig.' };
       help().textContent = messages[event.error] || `Spraakherkenning kon niet starten (${event.error}).`;
     };
-    recognition.onend = () => { listening = false; listenButton.textContent = '🎙️ Start spraakoefening'; updateScore(); };
+    recognition.onend = () => {
+      if (recognition !== session) return;
+      updateScore();
+      if (!listening) return;
+      help().textContent = 'Luisteren wordt hervat… je herkende tekst blijft bewaard.';
+      restartTimer = setTimeout(() => {
+        if (!listening || recognition !== session) return;
+        try {
+          session.start();
+          help().textContent = 'Luisteren… neem gerust een pauze. Klik op stop wanneer je klaar bent.';
+        } catch (_) {
+          listening = false;
+          listenButton.textContent = '🎙️ Start spraakoefening';
+          help().textContent = 'Het luisteren kon niet worden hervat. Je herkende tekst blijft staan. Start opnieuw om nog eens te oefenen.';
+        }
+      }, 300);
+    };
     try {
       recognition.start();
       listening = true;
