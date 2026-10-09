@@ -319,6 +319,84 @@ readScene();
   window.addEventListener('pagehide', stop);
 })();
 </script>
+<script id="text-editor-script">
+(function () {
+  const editor = document.createElement('details');
+  editor.className = 'speech-panel';
+  editor.innerHTML = '<summary><strong>✏️ Toneeltekst aanpassen</strong></summary>' +
+    '<p>Pas een repliek aan en sla deze op. Download daarna het publicatiebestand en upload dit naar GitHub om je wijzigingen met iedereen te delen.</p>' +
+    '<label>Scène<br><select id="edit-scene"></select></label> ' +
+    '<label>Repliek<br><select id="edit-line" style="max-width:100%"></select></label>' +
+    '<p><label>Speler<br><select id="edit-role"></select></label></p>' +
+    '<label>Tekst (regieaanwijzingen tussen haakjes)<br><textarea id="edit-text" rows="7" style="box-sizing:border-box;width:100%;padding:10px;font:inherit"></textarea></label>' +
+    '<p><button id="edit-save" type="button">Sla repliek op</button> <button id="edit-download" type="button">Download index.html voor GitHub</button></p>' +
+    '<p id="edit-status" aria-live="polite">Wijzigingen zijn pas voor iedereen zichtbaar na uploaden naar GitHub. Download ze vóór je deze pagina sluit.</p>';
+  document.querySelector('main').appendChild(editor);
+  const sceneSelect = $('edit-scene'), lineSelect = $('edit-line');
+  let dirty = false, unsaved = false;
+  D.scenes.forEach((scene, index) => sceneSelect.add(new Option(scene.title, index)));
+  D.roles.forEach(role => $('edit-role').add(new Option(role, role)));
+  function loadLine() {
+    const card = D.scenes[+sceneSelect.value].cards[+lineSelect.value];
+    $('edit-role').value = card.role;
+    $('edit-text').value = card.text;
+    unsaved = false;
+  }
+  function loadScene() {
+    lineSelect.innerHTML = '';
+    D.scenes[+sceneSelect.value].cards.forEach((card, index) => {
+      lineSelect.add(new Option(`${index + 1}. ${card.role}: ${card.text.slice(0, 65)}`, index));
+    });
+    loadLine();
+  }
+  function saveLine() {
+    const text = $('edit-text').value.trim();
+    if (!text) { $('edit-status').textContent = 'Vul eerst een tekst in.'; return false; }
+    const card = D.scenes[+sceneSelect.value].cards[+lineSelect.value];
+    card.text = text;
+    card.role = $('edit-role').value;
+    lineSelect.selectedOptions[0].textContent = `${+lineSelect.value + 1}. ${card.role}: ${text.slice(0, 65)}`;
+    dirty = true;
+    unsaved = false;
+    if (practicing) render(); else readScene();
+    $('edit-status').textContent = 'Repliek opgeslagen in deze pagina. Download index.html om de wijzigingen te bewaren en te publiceren.';
+    return true;
+  }
+  sceneSelect.onchange = loadScene;
+  lineSelect.onchange = loadLine;
+  $('edit-text').oninput = () => { unsaved = true; };
+  $('edit-role').onchange = () => { unsaved = true; };
+  $('edit-save').onclick = saveLine;
+  $('edit-download').onclick = async () => {
+    if (unsaved && !saveLine()) return;
+    try {
+      const response = await fetch(location.href.split('#')[0], { cache: 'no-store' });
+      if (!response.ok) throw new Error('download');
+      const source = await response.text();
+      const dataPattern = /const D=\{[^\r\n]*\};/;
+      if (!dataPattern.test(source)) throw new Error('data');
+      const json = JSON.stringify(D).replace(/</g, '\\u003c');
+      const updated = source.replace(dataPattern, () => `const D=${json};`);
+      const url = URL.createObjectURL(new Blob([updated], { type: 'text/html;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'index.html';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      dirty = false;
+      $('edit-status').textContent = 'Download gestart. Upload dit bestand in GitHub via Add file → Upload files → Commit changes. Daarna krijgt iedereen de aangepaste tekst.';
+    } catch (_) {
+      $('edit-status').textContent = 'Download niet gelukt. Open Cue! via je online GitHub-link en probeer opnieuw. Houd deze pagina open om je wijzigingen te bewaren.';
+    }
+  };
+  window.addEventListener('beforeunload', event => {
+    if (!dirty && !unsaved) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+  loadScene();
+})();
+</script>
 <script id="v5-script">
 (function(){
  function init(){
