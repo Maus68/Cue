@@ -223,6 +223,71 @@ readScene();
   readScene = function () { stopListening(); originalReadScene(); resetFeedback(); };
 })();
 </script>
+<script id="cue-read-aloud">
+(function () {
+  const supported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  const button = document.createElement('button');
+  button.id = 'speak-cues';
+  button.textContent = '🔊 Lees tegenspelers voor';
+  button.disabled = !supported;
+  $('read').parentElement.appendChild(button);
+  let generation = 0;
+  let speaking = false;
+  function stop() {
+    generation++;
+    speaking = false;
+    if (supported) window.speechSynthesis.cancel();
+    button.textContent = '🔊 Lees tegenspelers voor';
+  }
+  button.onclick = () => {
+    if (speaking) { stop(); return; }
+    const cards = cs();
+    let from = 0;
+    if (practicing) {
+      for (let i = pos - 1; i >= 0; i--) {
+        if (isMine(cards[i])) { from = i + 1; break; }
+      }
+    }
+    const lines = cards.slice(from, practicing ? pos : cards.length)
+      .filter(card => !isMine(card))
+      .map(card => card.text.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim())
+      .filter(text => /[\p{L}\p{N}]/u.test(text));
+    if (!lines.length) { $('status').textContent = 'Hier zijn geen replieken van tegenspelers om voor te lezen.'; return; }
+    const listen = $('listen');
+    if (listen && listen.textContent.startsWith('■')) listen.click();
+    stop();
+    speaking = true;
+    button.textContent = '■ Stop voorlezen';
+    const token = generation;
+    const voice = window.speechSynthesis.getVoices().find(v => /^nl[-_]/i.test(v.lang));
+    function speak(index) {
+      if (token !== generation) return;
+      if (index >= lines.length) {
+        stop();
+        $('status').textContent = practicing ? 'Jij bent aan de beurt. Zeg je repliek of start de spraakoefening.' : 'Voorlezen klaar.';
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(lines[index]);
+      utterance.lang = 'nl-NL';
+      if (voice) utterance.voice = voice;
+      utterance.onend = () => speak(index + 1);
+      utterance.onerror = () => {
+        if (token !== generation) return;
+        stop();
+        $('status').textContent = 'Voorlezen is onderbroken. Tik opnieuw op “Lees tegenspelers voor”.';
+      };
+      window.speechSynthesis.speak(utterance);
+    }
+    speak(0);
+  };
+  const previousRender = render;
+  render = function () { stop(); previousRender(); };
+  const previousReadScene = readScene;
+  readScene = function () { stop(); previousReadScene(); };
+  $('listen').addEventListener('click', stop);
+  window.addEventListener('pagehide', stop);
+})();
+</script>
 <script id="v5-script">
 (function(){
  function init(){
