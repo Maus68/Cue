@@ -384,12 +384,13 @@ window.cueVoiceForRole = function (role) {
     '<label>Repliek<br><select id="edit-line" style="max-width:100%"></select></label>' +
     '<p><label>Speler<br><select id="edit-role"></select></label></p>' +
     '<label>Tekst (regieaanwijzingen tussen haakjes)<br><textarea id="edit-text" rows="7" style="box-sizing:border-box;width:100%;padding:10px;font:inherit"></textarea></label>' +
-    '<p><button id="edit-save" type="button">Sla repliek op</button> <button id="edit-download" type="button">Download index.html voor GitHub</button></p>' +
+    '<p><button id="edit-save" type="button">Sla repliek op</button> <button id="edit-delete" type="button">Verwijder repliek</button> <button id="edit-undo-delete" type="button" disabled>Maak verwijderen ongedaan</button> <button id="edit-download" type="button">Download index.html voor GitHub</button></p>' +
     '<p id="edit-status" aria-live="polite">Wijzigingen zijn pas voor iedereen zichtbaar na uploaden naar GitHub. Download ze vóór je deze pagina sluit.</p>' +
     '<h3>Stemmen per speler</h3><p>Kies man of vrouw en beluister het voorbeeld. Je kunt ook zelf een Nederlandse stem kiezen. Stemmen verschillen per apparaat. Zonder passende stem gebruikt Cue! de standaardstem met een lagere of hogere toonhoogte.</p><div id="role-voice-settings"></div>';
   document.querySelector('main').appendChild(editor);
   const sceneSelect = $('edit-scene'), lineSelect = $('edit-line');
   let dirty = false, unsaved = false;
+  let deletedLine = null;
   D.roleVoices = D.roleVoices || {};
   const voiceRows = [];
   D.roles.forEach(role => {
@@ -451,18 +452,29 @@ window.cueVoiceForRole = function (role) {
   D.roles.forEach(role => $('edit-role').add(new Option(role, role)));
   function loadLine() {
     const card = D.scenes[+sceneSelect.value].cards[+lineSelect.value];
+    $('edit-save').disabled = !card;
+    $('edit-delete').disabled = !card;
+    $('edit-role').disabled = !card;
+    $('edit-text').disabled = !card;
+    if (!card) {
+      $('edit-text').value = '';
+      unsaved = false;
+      return;
+    }
     $('edit-role').value = card.role;
     $('edit-text').value = card.text;
     unsaved = false;
   }
-  function loadScene() {
+  function loadScene(selectedIndex = 0) {
     lineSelect.innerHTML = '';
     D.scenes[+sceneSelect.value].cards.forEach((card, index) => {
       lineSelect.add(new Option(`${index + 1}. ${card.role}: ${card.text.slice(0, 65)}`, index));
     });
+    lineSelect.selectedIndex = Math.min(Number.isInteger(selectedIndex) ? selectedIndex : 0, lineSelect.options.length - 1);
     loadLine();
   }
   function saveLine() {
+    if (!$('edit-line').options.length) return false;
     const text = $('edit-text').value.trim();
     if (!text) { $('edit-status').textContent = 'Vul eerst een tekst in.'; return false; }
     const card = D.scenes[+sceneSelect.value].cards[+lineSelect.value];
@@ -480,6 +492,40 @@ window.cueVoiceForRole = function (role) {
   $('edit-text').oninput = () => { unsaved = true; };
   $('edit-role').onchange = () => { unsaved = true; };
   $('edit-save').onclick = saveLine;
+  function refreshAfterDeletion() {
+    if (si === +sceneSelect.value && practicing) {
+      practicing = false;
+      readScene();
+      $('status').textContent = 'De scène is aangepast. Tik op “Start oefenen” om opnieuw te beginnen.';
+    } else if (practicing) render(); else readScene();
+  }
+  $('edit-delete').onclick = () => {
+    const sceneIndex = +sceneSelect.value;
+    const index = +lineSelect.value;
+    const cards = D.scenes[sceneIndex].cards;
+    if (!lineSelect.options.length || !cards[index]) return;
+    deletedLine = { sceneIndex, index, card: cards[index] };
+    cards.splice(index, 1);
+    dirty = true;
+    unsaved = false;
+    $('edit-undo-delete').disabled = false;
+    loadScene(index);
+    refreshAfterDeletion();
+    $('edit-status').textContent = 'Repliek verwijderd. Je kunt dit met “Maak verwijderen ongedaan” herstellen. Download index.html en upload die naar GitHub om het voor iedereen te wijzigen.';
+  };
+  $('edit-undo-delete').onclick = () => {
+    if (!deletedLine) return;
+    const { sceneIndex, index, card } = deletedLine;
+    D.scenes[sceneIndex].cards.splice(index, 0, card);
+    sceneSelect.value = String(sceneIndex);
+    deletedLine = null;
+    dirty = true;
+    unsaved = false;
+    $('edit-undo-delete').disabled = true;
+    loadScene(index);
+    refreshAfterDeletion();
+    $('edit-status').textContent = 'De laatst verwijderde repliek is teruggezet. Download index.html om je wijzigingen te bewaren.';
+  };
   $('edit-download').onclick = async () => {
     if (unsaved && !saveLine()) return;
     try {
