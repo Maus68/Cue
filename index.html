@@ -20,6 +20,7 @@ small{color:#666} .progress{height:8px;background:#ddd;border-radius:9px;overflo
 .v5-button.selected{background:#263449;color:#fff;border-color:#263449}
 .v5-help{font-size:.88rem;color:#64748b;margin-top:8px}
 .v5-direction{color:#737b87!important;font-style:italic!important;background:#f0f2f5;border-left:3px solid #aab2bf;padding:3px 8px;border-radius:4px}
+#out.cue-hide-directions .v5-direction{display:none}
 </style>
 </head>
 <body><div style="text-align:center;padding:7px;background:#eef2f7;border-bottom:1px solid #d8dee8;font-weight:800">Cue! · LEERAPP · VERSIE 5</div><header><b>Cue! – Toneeltekst Leerapp</b><div>Met de gesproken teksten van alle tegenspelers</div></header>
@@ -43,6 +44,20 @@ const D={"roles":["Bewaker","Jurylid 1","Jurylid 10","Jurylid 11","Jurylid 12","
 let si=0,pos=0,practicing=false,revealed=false;
 const $=x=>document.getElementById(x);
 function esc(s){return s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+function formatRepliek(text){
+ let result='', plain='', direction='', depth=0;
+ for(const character of text){
+  if(character==='('){
+   if(depth===0){result+=esc(plain);plain='';}
+   depth++;direction+=character;
+  }else if(character===')'&&depth>0){
+   direction+=character;depth--;
+   if(depth===0){result+=`<span class="v5-direction">${esc(direction)}</span>`;direction='';}
+  }else if(depth>0){direction+=character;}
+  else{plain+=character;}
+ }
+ return result+esc(plain+direction);
+}
 function cs(){return D.scenes[si]?.cards||[]}
 function isMine(c){return c.role===$('role').value}
 D.roles.forEach(r=>$('role').add(new Option(r,r)));
@@ -52,7 +67,7 @@ let def=D.roles.indexOf("Jurylid 8"); $('role').selectedIndex=def>=0?def:0;
 function readScene(){
  practicing=false; revealed=false;
  $('out').innerHTML=cs().map(c=>`<article class="card ${isMine(c)?'mine':''}">
- <b>${esc(c.role)}</b><div>${esc(c.text)}</div></article>`).join('');
+ <b>${esc(c.role)}</b><div>${formatRepliek(c.text)}</div></article>`).join('');
  $('bar').style.width='0%'; $('status').textContent=$('scene').selectedOptions[0]?.text||'';
 }
 function start(){
@@ -66,11 +81,11 @@ function render(){
  let h='';
  for(let i=0;i<pos;i++) {
    let c=a[i];
-   h+=`<article class="card cue"><b>${esc(c.role)}</b><div>${esc(c.text)}</div></article>`;
+   h+=`<article class="card cue"><b>${esc(c.role)}</b><div>${formatRepliek(c.text)}</div></article>`;
  }
  let c=a[pos];
  h+=`<article class="card mine"><b>${esc(c.role)} — MIJN TEKST</b>
- <div class="${revealed?'':'blur'}">${esc(c.text)}</div>
+ <div class="${revealed?'':'blur'}">${formatRepliek(c.text)}</div>
  <small>${revealed?'':'Zeg je repliek uit het hoofd en toon daarna de tekst ter controle.'}</small></article>`;
  $('out').innerHTML=h;
  $('bar').style.width=((pos+1)/a.length*100)+'%';
@@ -508,7 +523,7 @@ window.cueVoiceForRole = function (role) {
    '<button class="v5-button" data-mode="1">Laatste cue</button>'+
    '<button class="v5-button" data-mode="scene">Hele scène</button>'+
    '<button class="v5-button" id="v5-directions">Regieaanwijzingen: aan</button></div>'+
-   '<div class="v5-help">Kies hoeveel voorafgaande replieken je wilt zien. Regieaanwijzingen die als losse haakjesregel zijn herkend, worden apart opgemaakt.</div>';
+   '<div class="v5-help">Kies hoeveel voorafgaande replieken je wilt zien. Regieaanwijzingen tussen haakjes kun je tonen of verbergen.</div>';
   host.insertBefore(p,host.firstChild);
   let mode='all', showDirections=true;
   p.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{
@@ -519,7 +534,7 @@ window.cueVoiceForRole = function (role) {
   p.querySelector('#v5-directions').onclick=()=>{
    showDirections=!showDirections;
    p.querySelector('#v5-directions').textContent='Regieaanwijzingen: '+(showDirections?'aan':'uit');
-   document.querySelectorAll('.v5-direction').forEach(x=>x.style.display=showDirections?'':'none');
+   document.getElementById('out').classList.toggle('cue-hide-directions',!showDirections);
   };
   function applyCueMode(){
    const cards=[...document.querySelectorAll('.line-card,.dialogue-card,.repliek,.line')];
@@ -532,15 +547,7 @@ window.cueVoiceForRole = function (role) {
     el.style.display=(mode==='all'||mode==='scene'||(mode==='3'&&n<=3)||(mode==='1'&&n<=1))?'':'none';
    });
   }
-  function markDirections(){
-   document.querySelectorAll('p,div,span,li').forEach(el=>{
-    if(el.children.length)return;
-    const t=(el.textContent||'').trim();
-    if(/^\([^()]{2,220}\)$/.test(t))el.classList.add('v5-direction');
-   });
-  }
-  new MutationObserver(()=>{markDirections();applyCueMode()}).observe(document.body,{childList:true,subtree:true});
-  markDirections();
+  new MutationObserver(()=>{applyCueMode()}).observe(document.getElementById('out'),{childList:true,subtree:true});
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
