@@ -98,6 +98,7 @@ readScene();
   let recognition = null;
   let listening = false;
   let restartTimer = null;
+  let advanceTimer = null;
   let finalTranscript = '';
 
   const style = document.createElement('style');
@@ -111,6 +112,15 @@ readScene();
   listenButton.textContent = '🎙️ Start spraakoefening';
   listenButton.disabled = !SpeechRecognition;
   toolbar.insertBefore(listenButton, $('reveal'));
+  const autoLabel = document.createElement('label');
+  autoLabel.innerHTML = '<input type="checkbox" id="auto-cues"> Automatisch tegenspelers voorlezen';
+  toolbar.appendChild(autoLabel);
+  const autoCues = autoLabel.querySelector('input');
+  autoCues.disabled = !SpeechRecognition || !('speechSynthesis' in window);
+  autoCues.onchange = () => { clearTimeout(advanceTimer); };
+  window.addEventListener('cue-reading-finished', () => {
+    if (autoCues.checked && practicing && !listening) startListening();
+  });
 
   const panel = document.createElement('section');
   panel.id = 'speech-panel';
@@ -158,6 +168,7 @@ readScene();
   };
   const stopListening = () => {
     listening = false;
+    clearTimeout(advanceTimer);
     clearTimeout(restartTimer);
     restartTimer = null;
     if (recognition) recognition.stop();
@@ -181,11 +192,26 @@ readScene();
       }
       live().textContent = `Herkenning: ${(finalTranscript + interim).trim()}`;
       updateScore();
+      clearTimeout(advanceTimer);
+      const expected = words(cs()[pos].text);
+      const spoken = words(finalTranscript);
+      const tailLength = Math.min(3, expected.length);
+      const endsCorrectly = tailLength > 0 && spoken.slice(-tailLength).join(' ') === expected.slice(-tailLength).join(' ');
+      if (autoCues.checked && listening && !interim && endsCorrectly && lcsLength(expected, spoken) / expected.length >= 0.85) {
+        advanceTimer = setTimeout(() => {
+          if (!autoCues.checked || !listening || recognition !== session) return;
+          stopListening();
+          const previousPosition = pos;
+          next();
+          if (pos !== previousPosition) $('speak-cues').click();
+        }, 1800);
+      }
     };
     recognition.onerror = event => {
       if (recognition !== session || !listening) return;
       if (event.error === 'no-speech' || event.error === 'aborted') return;
       listening = false;
+      clearTimeout(advanceTimer);
       clearTimeout(restartTimer);
       listenButton.textContent = '🎙️ Start spraakoefening';
       const messages = { 'not-allowed': 'Microfoontoegang is niet toegestaan. Sta deze toe in de browser en probeer opnieuw.', 'no-speech': 'Geen spraak gehoord. Probeer het opnieuw.', 'network': 'Spraakherkenning heeft een netwerkverbinding nodig.' };
@@ -252,7 +278,11 @@ readScene();
       .filter(card => !isMine(card))
       .map(card => card.text.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim())
       .filter(text => /[\p{L}\p{N}]/u.test(text));
-    if (!lines.length) { $('status').textContent = 'Hier zijn geen replieken van tegenspelers om voor te lezen.'; return; }
+    if (!lines.length) {
+      $('status').textContent = 'Hier zijn geen replieken van tegenspelers om voor te lezen.';
+      window.dispatchEvent(new Event('cue-reading-finished'));
+      return;
+    }
     const listen = $('listen');
     if (listen && listen.textContent.startsWith('■')) listen.click();
     stop();
@@ -265,6 +295,7 @@ readScene();
       if (index >= lines.length) {
         stop();
         $('status').textContent = practicing ? 'Jij bent aan de beurt. Zeg je repliek of start de spraakoefening.' : 'Voorlezen klaar.';
+        window.dispatchEvent(new Event('cue-reading-finished'));
         return;
       }
       const utterance = new SpeechSynthesisUtterance(lines[index]);
