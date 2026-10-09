@@ -115,6 +115,28 @@ readScene();
   const autoLabel = document.createElement('label');
   autoLabel.innerHTML = '<input type="checkbox" id="auto-cues"> Automatisch tegenspelers voorlezen';
   toolbar.appendChild(autoLabel);
+  const toleranceLabel = document.createElement('label');
+  toleranceLabel.innerHTML = 'Herkenning: <select id="speech-tolerance"><option value="0.5">Heel soepel (50%)</option><option value="0.6" selected>Soepel (60%)</option><option value="0.75">Normaal (75%)</option><option value="0.85">Streng (85%)</option></select>';
+  toolbar.appendChild(toleranceLabel);
+  const tolerance = toleranceLabel.querySelector('select');
+  try {
+    const saved = localStorage.getItem('cue-speech-tolerance');
+    if (Array.from(tolerance.options).some(option => option.value === saved)) tolerance.value = saved;
+  } catch (_) {}
+  tolerance.onchange = () => {
+    clearTimeout(advanceTimer);
+    try { localStorage.setItem('cue-speech-tolerance', tolerance.value); } catch (_) {}
+    updateScore();
+  };
+  const doneButton = document.createElement('button');
+  doneButton.textContent = '✓ Ik ben klaar';
+  doneButton.type = 'button';
+  doneButton.disabled = !SpeechRecognition;
+  toolbar.appendChild(doneButton);
+  doneButton.onclick = () => {
+    if (!listening) return;
+    finishTurn();
+  };
   const autoCues = autoLabel.querySelector('input');
   autoCues.disabled = !SpeechRecognition || !('speechSynthesis' in window);
   autoCues.onchange = () => { clearTimeout(advanceTimer); };
@@ -158,7 +180,7 @@ readScene();
     const spoken = words(finalTranscript);
     if (!spoken.length) { score().textContent = ''; return; }
     const percentage = expected.length ? Math.round((lcsLength(expected, spoken) / expected.length) * 100) : 0;
-    score().textContent = `Overeenkomst met je repliek: ${percentage}%. ${percentage >= 85 ? 'Goed gedaan — controleer eventueel je tekst en ga verder.' : 'Blijf oefenen; toon je tekst om te vergelijken.'}`;
+    score().textContent = `Woordovereenkomst met je repliek: ${percentage}%. ${percentage >= Number(tolerance.value) * 100 ? 'Voldoende voor de gekozen herkenningsmarge.' : 'Nog onder de gekozen marge. Anders verwoord? Tik op “Ik ben klaar”.'}`;
   };
   const resetFeedback = () => {
     finalTranscript = '';
@@ -195,16 +217,12 @@ readScene();
       clearTimeout(advanceTimer);
       const expected = words(cs()[pos].text);
       const spoken = words(finalTranscript);
-      const tailLength = Math.min(3, expected.length);
-      const endsCorrectly = tailLength > 0 && spoken.slice(-tailLength).join(' ') === expected.slice(-tailLength).join(' ');
-      if (autoCues.checked && listening && !interim && endsCorrectly && lcsLength(expected, spoken) / expected.length >= 0.85) {
+      const enoughWords = spoken.length >= Math.ceil(expected.length * 0.75);
+      if (autoCues.checked && listening && !interim && expected.length && enoughWords && lcsLength(expected, spoken) / expected.length >= Number(tolerance.value)) {
         advanceTimer = setTimeout(() => {
           if (!autoCues.checked || !listening || recognition !== session) return;
-          stopListening();
-          const previousPosition = pos;
-          next();
-          if (pos !== previousPosition) $('speak-cues').click();
-        }, 1800);
+          finishTurn();
+        }, 2500);
       }
     };
     recognition.onerror = event => {
@@ -238,10 +256,18 @@ readScene();
       recognition.start();
       listening = true;
       listenButton.textContent = '■ Stop spraakoefening';
-      help().textContent = 'Luisteren… zeg je repliek hardop. Klik op stop wanneer je klaar bent.';
+      help().textContent = 'Luisteren… kleine tekstafwijkingen mogen. Bij voldoende herkenning gaat Cue! na een pauze verder. Anders kun je op “Ik ben klaar” tikken.';
     } catch (_) { help().textContent = 'De microfoon start al. Klik op stop en probeer opnieuw.'; }
   };
   listenButton.onclick = () => listening ? stopListening() : startListening();
+  function finishTurn() {
+    stopListening();
+    updateScore();
+    if (!autoCues.checked) return;
+    const previousPosition = pos;
+    next();
+    if (pos !== previousPosition) $('speak-cues').click();
+  }
 
   const originalRender = render;
   render = function () { stopListening(); originalRender(); resetFeedback(); };
