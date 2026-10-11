@@ -22,6 +22,20 @@ small{color:#666} .progress{height:8px;background:#ddd;border-radius:9px;overflo
 .v5-direction{color:#737b87!important;font-style:italic!important;background:#f0f2f5;border-left:3px solid #aab2bf;padding:3px 8px;border-radius:4px}
 #out.cue-hide-directions .v5-direction{display:none}
 </style>
+<style id="cue-design">
+:root{color-scheme:dark;--bg:#03131f;--panel:#0b2235;--border:#26465b;--text:#edf5fc;--muted:#a5bdce;--yellow:#ffcf56;--green:#32d5ad}
+body{background:radial-gradient(ellipse at top,#143047,var(--bg) 60%);color:var(--text);font-family:system-ui,sans-serif;min-height:100vh;padding-bottom:90px}
+body>div:first-child{background:#071a29!important;border-color:var(--border)!important;color:var(--muted);font-size:11px;letter-spacing:2px}
+header{max-width:900px;margin:auto;background:transparent;padding:30px 24px 20px}header b{font-size:38px;font-style:italic;color:var(--yellow)}header div{color:var(--muted);margin-top:5px}
+main{max-width:900px;padding:16px 24px}.cue-view[hidden]{display:none!important}h1{font-size:28px;margin:10px 0}h2{font-size:20px}p{line-height:1.6}.eyebrow{font-size:12px;letter-spacing:2px;color:var(--green);font-weight:700}.subtitle{color:var(--muted)}
+button,select,input,textarea{background:#102b40;color:var(--text);border:1px solid var(--border);border-radius:12px;font:inherit}button{min-height:46px;transition:background .15s,transform .15s}button:hover{background:#1b3c54}button:active{transform:translateY(1px)}button:disabled{opacity:.45;cursor:default}button:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--green);outline-offset:3px}select{width:100%;margin-top:8px}label{color:var(--muted)}
+#start,.primary,#next,#import-add{background:var(--yellow);color:#142132;border-color:var(--yellow);font-weight:750}#start:hover,#next:hover{background:#ffe18a}.toolbar{gap:10px;margin:20px 0}.toolbar label{display:flex;align-items:center;gap:8px;font-size:13px}.toolbar select{width:auto;margin:0}.toolbar input{accent-color:var(--green)}
+.card,.speech-panel,.v5-panel{background:var(--panel)!important;border:1px solid var(--border)!important;color:var(--text)!important;border-radius:16px;padding:18px;box-shadow:none}.card{margin:14px 0}.card b{display:block;color:var(--muted);font-size:12px;letter-spacing:1px;margin-bottom:8px}.card.mine{border-left:4px solid var(--yellow)!important;background:#173348!important}.card.mine b{color:var(--yellow)}.card div{font-size:18px}.note{background:#0b2734;color:var(--muted);border:1px solid var(--border);margin:15px 0}.progress{background:#17384c;height:6px}#bar{background:var(--green)}#status{color:var(--muted);font-size:14px}small,.v5-help{color:var(--muted)!important}.speech-live{color:var(--text)!important}.speech-score{color:var(--green)}.v5-button{background:#102b40;color:var(--text);border-color:var(--border)}.v5-button.selected{background:var(--yellow);color:#142132}.v5-direction{background:#152b3b!important;color:#b4c7d4!important;border-color:#4c6a7d}.speech-panel.unsupported{background:#33291b!important}.speech-panel p{line-height:1.5}
+details{border:1px solid var(--border);background:var(--panel);border-radius:16px;padding:18px;margin:16px 0}summary{cursor:pointer;font-weight:700}details input,textarea{padding:12px!important}#role-voice-settings>div{border-color:var(--border)!important;background:transparent!important}#role-voice-settings select{width:auto}
+.play-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:24px 0}.play-tile{padding:24px;text-align:left;min-height:170px;background:linear-gradient(135deg,#17374d,#0a2031);border:1px solid var(--border)}.play-tile strong{display:block;font-size:24px;margin:18px 0 8px}.play-tile span{display:block;color:var(--muted);font-size:14px}.play-tile em{font-style:normal;color:var(--green);font-size:13px;display:block;margin-top:18px}.play-icon{font-size:26px;color:var(--yellow)}
+.cue-nav{position:fixed;bottom:0;left:0;right:0;background:#061a29f5;backdrop-filter:blur(12px);border-top:1px solid var(--border);display:flex;justify-content:center;gap:8px;padding:12px 12px max(12px,env(safe-area-inset-bottom));z-index:20}.cue-nav button{border:0;background:transparent;color:var(--muted);width:140px;font-size:14px}.cue-nav button[aria-current=page]{color:var(--yellow);background:#142d3d}.back-home{margin-bottom:14px}.practice-heading{margin:0 0 20px}.grid{gap:16px}.add-play{width:100%;background:var(--yellow);color:#142132;font-weight:750}
+@media(max-width:650px){header{padding:24px 18px 12px}main{padding:12px 18px}.play-list{grid-template-columns:1fr;gap:12px}.play-tile{min-height:130px;padding:18px}.play-tile strong{font-size:22px;margin-top:10px}.toolbar button{flex:1 1 42%;font-size:14px}.card div{font-size:17px}.cue-nav button{width:33%}h1{font-size:25px}.grid{grid-template-columns:1fr}#role-voice-settings select{width:100%}}
+</style>
 </head>
 <body><div style="text-align:center;padding:7px;background:#eef2f7;border-bottom:1px solid #d8dee8;font-weight:800">Cue! · LEERAPP · VERSIE 5</div><header><b>Cue! – Toneeltekst Leerapp</b><div>Met de gesproken teksten van alle tegenspelers</div></header>
 <main>
@@ -770,5 +784,27 @@ window.cueDocxText = async function (buffer) {
   fillChoices();
 })();
 
+</script>
+<script id="cue-design-script">
+document.addEventListener('DOMContentLoaded',()=>{
+ const main=document.querySelector('main');
+ const home=document.createElement('section');home.id='cue-home';home.className='cue-view';
+ home.innerHTML='<p class="eyebrow">JOUW PODIUM. JOUW TEKST.</p><h1>Mijn toneelstukken</h1><p class="subtitle">Kies een toneelstuk, pak je rol en speel.</p><div class="play-list" id="cue-play-list"></div><button class="add-play" id="cue-add-play">＋ Nieuw toneelstuk</button>';
+ const practice=document.createElement('section');practice.id='cue-practice';practice.className='cue-view';
+ const settings=document.createElement('section');settings.id='cue-settings';settings.className='cue-view';
+ const library=document.getElementById('script-choice').closest('.speech-panel');
+ const editor=document.getElementById('edit-text').closest('details');
+ const options=document.getElementById('v5-panel');
+ const nodes=[...main.children];nodes.forEach(n=>{if(n===library||n===editor||n===options)return;practice.appendChild(n)});
+ const heading=document.createElement('div');heading.className='practice-heading';heading.innerHTML='<p class="eyebrow">LEER JE TEKST. SPEEL JE ROL.</p><h1>Oefenen</h1>';practice.prepend(heading);
+ settings.innerHTML='<h1>Instellingen en scripts</h1><p class="subtitle">Pas je oefening aan of werk je toneeltekst bij.</p>';settings.append(options,editor);
+ home.appendChild(library);main.replaceChildren(home,practice,settings);
+ const nav=document.createElement('nav');nav.className='cue-nav';nav.setAttribute('aria-label','Hoofdnavigatie');nav.innerHTML='<button data-view="cue-home">⌂ &nbsp; Mijn stukken</button><button data-view="cue-practice">▷ &nbsp; Oefenen</button><button data-view="cue-settings">⚙ &nbsp; Instellingen</button>';document.body.appendChild(nav);
+ function show(id){[home,practice,settings].forEach(n=>n.hidden=n.id!==id);nav.querySelectorAll('button').forEach(b=>{if(b.dataset.view===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});window.scrollTo(0,0)}
+ nav.querySelectorAll('button').forEach(b=>b.onclick=()=>show(b.dataset.view));
+ function tiles(){const list=document.getElementById('cue-play-list');list.replaceChildren();CUE_LIBRARY.scripts.forEach((script,i)=>{const b=document.createElement('button');b.className='play-tile';b.innerHTML='<div class="play-icon" aria-hidden="true">🎭</div><strong>'+esc(script.title)+'</strong><span>'+script.data.scenes.length+' scènes · '+script.data.roles.length+' rollen</span><em>Kies je rol en begin →</em>';b.onclick=()=>{const choice=document.getElementById('script-choice');choice.value=String(i);choice.dispatchEvent(new Event('change'));show('cue-practice')};list.appendChild(b)})}
+ document.getElementById('cue-add-play').onclick=()=>{library.querySelector('details').open=true;library.scrollIntoView({behavior:'smooth'});document.getElementById('import-title').focus()};
+ window.addEventListener('cue-script-changed',tiles);tiles();show('cue-home');
+});
 </script>
 </body></html>
